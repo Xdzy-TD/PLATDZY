@@ -148,9 +148,14 @@ export default defineConfig(() => {
                 if (fs.existsSync(phpFilePath)) {
                   try {
                     const result = await runPhpScript(phpFilePath, req.method || 'GET', dataChunks, queryString);
-                    res.statusCode = 200;
-                    res.end(JSON.stringify(result));
-                    return;
+                    // Check if real PHP returned a database connection error, and fall back to simulator
+                    if (result && result.success === false && result.message && (result.message.includes('Database connection failure') || result.message.includes('could not find driver'))) {
+                      console.log(`[PHP Hybrid Engine] real PHP database connection failed (${result.message}). Falling back to simulation.`);
+                    } else {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify(result));
+                      return;
+                    }
                   } catch (phpErr: any) {
                     if (phpErr.code !== 'ENOENT') {
                       console.log(`[PHP Hybrid Engine] execution failed. Error: ${phpErr.message}`);
@@ -293,7 +298,6 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
