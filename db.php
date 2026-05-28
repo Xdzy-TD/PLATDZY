@@ -1,0 +1,420 @@
+<?php
+/**
+ * Plat Database Connection and Table Bootstrapping
+ * Uses PHP PDO for standard compatibility and protection.
+ */
+
+// Database Connection Mode Configuration
+// Option 'auto': Automatically tries XAMPP MySQL first, and falls back to SQLite if MySQL is not running! (Recommended)
+// Option 'sqlite': Forces a portable file-based database locally (zero configuration needed!)
+// Option 'mysql': Forces MySQL/MariaDB (perfect for XAMPP / phpMyAdmin setups)
+define('DB_MODE', 'auto'); 
+
+// MySQL/MariaDB Configuration (Used if DB_MODE is 'mysql' or 'auto')
+define('DB_HOST', 'localhost');
+define('DB_PORT', '3306');
+define('DB_NAME', 'plat_recipes');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Define SQLite database path
+$db_file = __DIR__ . '/plat.db';
+
+try {
+    $pdo = null;
+    $connected_mysql = false;
+
+    // Attempt MySQL first if mode is 'auto' or 'mysql'
+    if (DB_MODE === 'auto' || DB_MODE === 'mysql') {
+        try {
+            // Establish a quick-probing connection to MySQL (WITHOUT database selection initially)
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";charset=utf8mb4";
+            
+            // Set connection timeout low for quick auto-detection fallback
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_TIMEOUT => 2, // 2 seconds timeout to ensure instant fallback
+            ];
+            
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+
+            // Auto-create database if it doesn't exist
+            $db_name_safe = "`" . str_replace("`", "``", DB_NAME) . "`";
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS $db_name_safe CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+            $pdo->exec("USE $db_name_safe;");
+            
+            $connected_mysql = true;
+        } catch (PDOException $mysql_err) {
+            if (DB_MODE === 'mysql') {
+                // If explicitly forced, throw the error
+                throw $mysql_err;
+            }
+            // Otherwise, we gracefully swallow the exception and fall back to SQLite
+            $pdo = null;
+        }
+    }
+
+    // Default to SQLite if MySQL connection was skipped or failed
+    if (!$connected_mysql) {
+        // Primary SQLite source connector
+        $pdo = new PDO("sqlite:" . $db_file);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+        // Turn on WAL mode & optimize synchronicity for massive disk write speedup
+        $pdo->exec("PRAGMA journal_mode = WAL;");
+        $pdo->exec("PRAGMA synchronous = NORMAL;");
+    }
+
+    // Bootstrapping tables on-the-fly when file loads
+    $pdo->exec("CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(64) PRIMARY KEY,
+        email VARCHAR(128) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        fullname VARCHAR(128) NOT NULL,
+        plan VARCHAR(32) DEFAULT 'free',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    if (DB_MODE === 'sqlite') {
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)");
+    } else {
+        try {
+            $result = $pdo->query("SHOW KEYS FROM users WHERE Key_name = 'idx_users_email'")->fetchAll();
+            if (empty($result)) {
+                $pdo->exec("CREATE INDEX idx_users_email ON users(email)");
+            }
+        } catch (Exception $e) {
+            // Index already exists or DB schema doesn't allow index check
+        }
+    }
+
+    // Bootstrapping recipes table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS recipes (
+        id VARCHAR(64) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(64) NOT NULL,
+        prep VARCHAR(32),
+        cook VARCHAR(32),
+        servings VARCHAR(32),
+        difficulty VARCHAR(32),
+        image TEXT,
+        description TEXT,
+        ingredients TEXT,
+        steps TEXT,
+        created_at BIGINT,
+        updated_at BIGINT
+    )");
+
+    if (DB_MODE === 'sqlite') {
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_recipes_category ON recipes(category)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at DESC)");
+    } else {
+        try {
+            $resultCat = $pdo->query("SHOW KEYS FROM recipes WHERE Key_name = 'idx_recipes_category'")->fetchAll();
+            if (empty($resultCat)) {
+                $pdo->exec("CREATE INDEX idx_recipes_category ON recipes(category)");
+            }
+            $resultCreated = $pdo->query("SHOW KEYS FROM recipes WHERE Key_name = 'idx_recipes_created_at'")->fetchAll();
+            if (empty($resultCreated)) {
+                $pdo->exec("CREATE INDEX idx_recipes_created_at ON recipes(created_at DESC)");
+            }
+        } catch (Exception $e) {
+            // Index already exists or DB schema doesn't allow index check
+        }
+    }
+
+    // Auto-seed the recipes table if less than 17 recipes
+    $count = $pdo->query("SELECT COUNT(*) FROM recipes")->fetchColumn();
+    if ($count < 17) {
+        $pdo->exec("DELETE FROM recipes WHERE id LIKE 'r_seed_%' OR id IN ('s1', 's2', 's3', 's4')");
+        $seed_recipes = [
+            [
+                'id' => 'r_seed_1',
+                'title' => 'Spaghetti Carbonara',
+                'category' => 'Dinner',
+                'prep' => '15 min',
+                'cook' => '20 min',
+                'servings' => '4',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1600803907087-f56d462fd26b?w=600&q=75',
+                'description' => 'A Roman classic — crispy guanciale, eggs, Pecorino Romano and freshly cracked black pepper.',
+                'ingredients' => json_encode(['400g high-quality spaghetti', '150g pork guanciale, diced', '4 fresh farm egg yolks', '100g Pecorino Romano, grated', 'Black pepper corns', 'Salt']),
+                'steps' => json_encode(['Boil large pot of water, add rock salt, and lower spaghetti to boil al dente.', 'Sauté guanciale on low heat until fat renders and bits turn beautifully golden and crispy.', 'Whisk egg yolks together with grated Pecorino Romano and cracked black pepper until thick paste forms.', 'Drain cooked pasta, keeping half a cup of starchy water.', 'Combine pasta with crispy guanciale off-heat. Quickly stir in egg paste, tossing vigorously to form emulsified creamy sauce. Add pasta water as needed.']),
+                'created_at' => (time() - 172800) * 1000,
+                'updated_at' => (time() - 172800) * 1000
+            ],
+            [
+                'id' => 'r_seed_2',
+                'title' => 'Lemon Blueberry Pancakes',
+                'category' => 'Breakfast',
+                'prep' => '10 min',
+                'cook' => '15 min',
+                'servings' => '2',
+                'difficulty' => 'Easy',
+                'image' => 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=75',
+                'description' => 'Fluffy golden pancakes filled with fresh whole blueberries and fragrant lemon zest sweeps.',
+                'ingredients' => json_encode(['1 cup all-purpose flour', '2 tbsp organic sugar', '1 tsp baking powder', '1 cup buttermilk', '1 organic egg', '1 cup organic blueberries', '2 tsp lemon zest']),
+                'steps' => json_encode(['Whisk flour, sugar, baking powder, and pinch of salt in standard mixing bowl.', 'Fold in buttermilk, lightly beaten egg, and lemon zest. Do not overmix batter.', 'Heat skillet with butter, ladle batter portions, scatter fresh blueberries on top.', 'Cook until surface starts bubbles, flip and roast 2 minutes until perfectly fluffy.']),
+                'created_at' => (time() - 86400) * 1000,
+                'updated_at' => (time() - 86400) * 1000
+            ],
+            [
+                'id' => 'r_seed_3',
+                'title' => 'Mango Coconut Smoothie',
+                'category' => 'Drinks',
+                'prep' => '5 min',
+                'cook' => '0 min',
+                'servings' => '1',
+                'difficulty' => 'Easy',
+                'image' => 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=600&q=75',
+                'description' => 'A tropical cooling bliss — combines frozen mango chunks, thick coconut cream and ginger spikes.',
+                'ingredients' => json_encode(['1 cup organic frozen mango', '1/2 cup organic coconut milk', '1/2 cup cold pressed orange juice', '1 tsp shaved ginger root', '1 tbsp raw honey']),
+                'steps' => json_encode(['Place all ingredients into high-speed blender canister.', 'Blend for 60 seconds until completely thick and smooth.', 'Garnish with toasted code flakes and serve ice cold.']),
+                'created_at' => (time() - 3600) * 1000,
+                'updated_at' => (time() - 3600) * 1000
+            ],
+            [
+                'id' => 'r_seed_4',
+                'title' => 'Butter Chicken (Murgh Makhani)',
+                'category' => 'Dinner',
+                'prep' => '20 min',
+                'cook' => '30 min',
+                'servings' => '4',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=600&q=75',
+                'description' => 'An iconic North Indian masterpiece—tender marinated chicken pieces simmered in a velvet-smooth, spiced tomato, butter, and cream gravy.',
+                'ingredients' => json_encode(['800g boneless chicken thighs, cubed', '1 cup Greek yogurt', '2 tbsp ginger-garlic paste', '2 tbsp Garam Masala', '1 tbsp Kashmiri red chili powder', '1 cup tomato purée', '100g unsalted butter', '1/2 cup heavy cream', 'Fresh cilantro for garnish']),
+                'steps' => json_encode(['Marinate chicken cubes with yogurt, ginger-garlic paste, lemon juice, garam masala, and Kashmiri chili powder for 1 hour.', 'Grill or pan-fry the marinated chicken until perfectly cooked and slightly charred on the edges. Set aside.', 'In a deep pan, melt half the butter and sauté the remaining ginger-garlic paste. Add tomato purée and simmer on medium heat for 10 minutes.', 'Stir in the heavy cream, garam masala, and remaining butter to create a silky, glossy gravy.', 'Add the chicken to the gravy and simmer gently for 5-8 minutes. Garnish generously with fresh cilantro.']),
+                'created_at' => (time() - 1200) * 1000,
+                'updated_at' => (time() - 1200) * 1000
+            ],
+            [
+                'id' => 'r_seed_5',
+                'title' => 'Tandoori Paneer Tikka',
+                'category' => 'Snack',
+                'prep' => '15 min',
+                'cook' => '15 min',
+                'servings' => '3',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&q=75',
+                'description' => 'Marinated cottage cheese skewers grilled with crisp bell peppers, onions, and traditional yogurt tandoori spices.',
+                'ingredients' => json_encode(['400g Paneer (cottage cheese), cubed', '1 large yellow bell pepper, squared', '1 large red onion, squared', '1/2 cup thick hung curd', '1 tbsp lemon juice', '2 tsp tandoori masala', '1 tsp chaat masala', 'Skewers']),
+                'steps' => json_encode(['Whisk hung curd, lemon juice, tandoori masala, a splash of mustard oil, and salt in a large bowl.', 'Gently fold in the paneer cubes, onion squares, and bell pepper squares. Let marinate for 30 minutes.', 'Thread the marinated paneer, onions, and peppers alternately onto wooden skewers.', 'Preheat a heavy skillet or oven to 200°C and grill for 12-15 minutes, turning occasionally, until golden-brown and smoky.', 'Sprinkle with chaat masala and fresh key-lime squeeze before serving hot.']),
+                'created_at' => (time() - 600) * 1000,
+                'updated_at' => (time() - 600) * 1000
+            ],
+            [
+                'id' => 'r_seed_6',
+                'title' => 'Crispy Masala Dosa',
+                'category' => 'Breakfast',
+                'prep' => '20 min',
+                'cook' => '15 min',
+                'servings' => '4',
+                'difficulty' => 'Hard',
+                'image' => 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=75',
+                'description' => 'A classic golden-and-crispy South Indian fermented rice-lentil crepe stuffed with savory bhaji (spiced mashed potato filling).',
+                'ingredients' => json_encode(['3 cups parboiled rice', '1 cup split black gram (urad dal)', '4 large potatoes, boiled and mashed', '1 medium onion, sliced', '1 tsp mustard seeds', '1/2 tsp turmeric powder', '2 green chilies, chopped', 'Ghee or oil for roasting', 'Salt']),
+                'steps' => json_encode(['Grind soaked rice and dal separately into a smooth batter, then ferment in a warm place overnight.', 'To make potato filling, heat oil, splutter mustard seeds, sauté onions, green chilies, and curry leaves.', 'Add turmeric, salt, and mashed potatoes. Stir well, splash of water, simmer for 5 minutes.', 'Heat a non-stick tawa griddle, pour a ladle of batter, and spiral swirl outward to form a thin circular crepe.', 'Drizzle ghee along the edges, roast until crispy golden-brown, scoop potatoes in center, fold and serve.']),
+                'created_at' => (time() - 300) * 1000,
+                'updated_at' => (time() - 300) * 1000
+            ],
+            [
+                'id' => 'r_seed_7',
+                'title' => 'Greek Avocado Salad',
+                'category' => 'Lunch',
+                'prep' => '10 min',
+                'cook' => '0 min',
+                'servings' => '2',
+                'difficulty' => 'Easy',
+                'image' => 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=75',
+                'description' => 'A crisp, refreshing Mediterranean salad packed with creamy avocado, vine-ripened tomatoes, cucumbers, Kalamata olives, and rich feta cheese drizzled with wild oregano-infused olive oil.',
+                'ingredients' => json_encode(['2 ripe avocados, cubed', '200g cherry tomatoes, halved', '1 English cucumber, sliced', '100g Kalamata olives', '150g block Greek feta cheese, crumbled', '3 tbsp cold-pressed extra virgin olive oil', '1 tbsp lemon juice', '1 tsp dried wild oregano', 'Sea salt & cracked black pepper']),
+                'steps' => json_encode(['Whisk extra virgin olive oil, fresh lemon juice, wild oregano, salt, and black pepper in a small bowl to emulsify.', 'Combine cubed avocados, halved cherry tomatoes, sliced cucumbers, and Kalamata olives in a large wooden salad bowl.', 'Drizzle the dressing over the ingredients and toss gently so the avocado stays intact.', 'Transfer to serving plates and crumble fresh Greek feta cheese generously over the top.', 'Finish with a final dust of black pepper and serve immediately with warm crusty pita bread.']),
+                'created_at' => (time() - 290) * 1000,
+                'updated_at' => (time() - 290) * 1000
+            ],
+            [
+                'id' => 'r_seed_9',
+                'title' => 'Matcha Green Tea Mochi',
+                'category' => 'Dessert',
+                'prep' => '25 min',
+                'cook' => '10 min',
+                'servings' => '6',
+                'difficulty' => 'Hard',
+                'image' => 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=600&q=75',
+                'description' => 'Delicate, sweet, and chewy Japanese mochi rice cakes infused with premium culinary matcha green tea powder and filled with sweet red bean paste.',
+                'ingredients' => json_encode(['1 cup sweet glutinous rice flour (mochiko)', '1 tbsp premium culinary matcha powder', '1/4 cup sugar', '1 cup organic coconut water', '1/2 cup sweet red bean paste (anko)', 'Cornstarch for dusting']),
+                'steps' => json_encode(['Divide the sweet red bean paste into 6 equal portions and roll them into small solid balls. Freeze for 10 minutes to firm up.', 'Whisk glutinous rice flour, matcha powder, and sugar in a microwave-safe glass bowl until combined.', 'Gradually pour in organic coconut water and whisk until a smooth, thin green batter forms.', 'Cover the bowl loosely with plastic wrap. Microwave on high for 2 minutes, stir vigorously with a wet spatula, then microwave for another 1 minute until translucent and sticky.', 'Dust a clean work surface generously with cornstarch. Roll the hot mochi dough out, divide into 6 flat circles, place a red bean portion in the center, pinch the edges to seal, and cool before serving.']),
+                'created_at' => (time() - 270) * 1000,
+                'updated_at' => (time() - 270) * 1000
+            ],
+            [
+                'id' => 'r_seed_10',
+                'title' => 'Classic Eggs Benedict',
+                'category' => 'Breakfast',
+                'prep' => '10 min',
+                'cook' => '15 min',
+                'servings' => '2',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=600&q=75',
+                'description' => 'Poached free-range eggs and crisp Canadian back bacon served over butter-toasted English muffins, topped with a velvety, rich lemon-chervil Hollandaise sauce.',
+                'ingredients' => json_encode(['4 free-range eggs (for poaching)', '2 fresh egg yolks (for sauce)', '1 tbsp lemon juice', '100g unsalted butter, melted and hot', '2 English muffins, split', '4 slices Canadian bacon', '1 tbsp white vinegar', 'Chives for garnish']),
+                'steps' => json_encode(['To make Hollandaise, blend 2 egg yolks and lemon juice until smooth. With blender running, drizzle in hot melted butter in a thin stream until thick and creamy.', 'Sear the Canadian bacon slices in a hot skillet for 2 minutes on each side until slightly crisp; set aside.', 'Bring a pan of water to a gentle simmer, add white vinegar, create a soft whirlpool, and crack eggs in to poach for exactly 3 minutes.', 'Split and toast the English muffins, then butter them generously.', 'Assemble by layering a muffin half, a bacon slice, a poached egg, and ladling the warm silky Hollandaise sauce over. Garnish with chopped fresh chives.']),
+                'created_at' => (time() - 260) * 1000,
+                'updated_at' => (time() - 260) * 1000
+            ],
+            [
+                'id' => 'r_seed_11',
+                'title' => 'Classic Shoyu Ramen',
+                'category' => 'Dinner',
+                'prep' => '20 min',
+                'cook' => '25 min',
+                'servings' => '2',
+                'difficulty' => 'Hard',
+                'image' => 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&q=75',
+                'description' => 'Comfort in a bowl featuring springy noodles in a rich, savory soy-sauce infused dashi broth, topped with tender chashu, soft-boiled ajitama egg, and bamboo shoots.',
+                'ingredients' => json_encode(['2 portions fresh ramen noodles', '4 cups chicken and dashi broth', '4 tbsp Shoyu seasoning paste (soy sauce, mirin, sake)', '4 slices chashu pork or braised chicken', '2 soft-boiled marinated eggs (ajitama)', '1/2 cup green onions, sliced', 'Nori seaweed sheets']),
+                'steps' => json_encode(['Bring dashi and chicken broth to a gentle simmer in a large soup pot.', 'Stir the shoyu seasoning paste into the serving bowls to create the aromatic base.', 'Boil the fresh ramen noodles separately for 2 minutes or according to instructions.', 'Drain noodles and place them neatly into the bowls with the hot broth.', 'Top with slices of chashu, a halved marinated egg, sliced green onions, and a sheet of nori.']),
+                'created_at' => (time() - 50) * 1000,
+                'updated_at' => (time() - 50) * 1000
+            ],
+            [
+                'id' => 'r_seed_12',
+                'title' => 'Crispy Chicken Katsu Curry',
+                'category' => 'Lunch',
+                'prep' => '20 min',
+                'cook' => '20 min',
+                'servings' => '3',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=600&q=75',
+                'description' => 'A crispy, golden, deep-fried panko-breaded chicken cutlet served alongside a thick, comforting, and mildly sweet Japanese curry gravy over steaming rice.',
+                'ingredients' => json_encode(['3 chicken breasts, pounded flat', '1 cup panko breadcrumbs', '1/2 cup all-purpose flour', '2 beaten eggs', '1 block Japanese curry roux', '1 cup potatoes and carrots, cubed', '1 onion, sliced', 'Steamed sushi rice']),
+                'steps' => json_encode(['Coat chicken breasts in flour, dip in beaten eggs, then press firmly into panko crumbs.', 'Deep-fry the coated chicken cutlets until deep golden-brown and crispy. Slice into strips.', 'Sauté sliced onions, carrots, and potatoes in a saucepan with oil until soft.', 'Add water, simmer for 10 minutes until veggies are tender, then melt in the curry roux blocks.', 'Pour the hot, thick curry sauce generously over a plate of rice and top with the crispy chicken katsu slices.']),
+                'created_at' => (time() - 40) * 1000,
+                'updated_at' => (time() - 40) * 1000
+            ],
+            [
+                'id' => 'r_seed_13',
+                'title' => 'Authentic Pad Thai',
+                'category' => 'Dinner',
+                'prep' => '15 min',
+                'cook' => '15 min',
+                'servings' => '2',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=600&q=75',
+                'description' => 'The quintessential Thai streets delicacy of stir-fried flat rice noodles cooked with tofu, shrimp, egg, bean sprouts, peanuts, and a sweet-tangy tamarind sauce.',
+                'ingredients' => json_encode(['200g flat rice noodles, soaked in warm water', '100g firm tofu, cubed', '100g fresh shrimp, peeled', '1/3 cup authentic tamarind paste', '3 tbsp palm sugar', '2 tbsp fish sauce', '2 beaten eggs', '1/2 cup bean sprouts', '3 tbsp crushed roasted peanuts', 'Lime wedges and chives']),
+                'steps' => json_encode(['Prepare the sauce by cooking tamarind paste, palm sugar, and fish sauce together until dissolved.', 'Heat a wok with oil, sauté the tofu cubes and shrimp until shrimp are pink and cooked through.', 'Push to the side, scramble the eggs in the wok, then toss in the drained rice noodles.', 'Pour in the tamarind sauce, mix thoroughly, then fold in bean sprouts and garlic chives.', 'Plate warm topped with roasted crushed peanuts, red pepper flakes, and fresh lime wedges to squeeze.']),
+                'created_at' => (time() - 30) * 1000,
+                'updated_at' => (time() - 30) * 1000
+            ],
+            [
+                'id' => 'r_seed_14',
+                'title' => 'Fragrant Thai Green Curry',
+                'category' => 'Lunch',
+                'prep' => '15 min',
+                'cook' => '20 min',
+                'servings' => '3',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=600&q=75',
+                'description' => 'An intensely aromatic curry bursting with fresh green herbs, featuring lemongrass, galangal, kaffir lime leaves, tender chicken breast, and Thai baby eggplants.',
+                'ingredients' => json_encode(['500g chicken breast, sliced', '3 tbsp green curry paste', '1 can unsweetened coconut milk', '4 Thai eggplants, quartered', '1 cup bamboo shoots', '6 kaffir lime leaves, torn', '1 tbsp fish sauce', '1 tbsp palm sugar', '1/2 cup fresh Thai sweet basil leaves']),
+                'steps' => json_encode(['Sauté the green curry paste in a deep pot with a coconut oil glaze until aromatic.', 'Gradually pour in half the coconut milk and simmer until oil separates from the cream.', 'Add chicken slices and stir-fry for 3 minutes, then add the rest of the coconut milk and water.', 'Stir in the Thai eggplants, bamboo shoots, kaffir lime leaves, palm sugar, and fish sauce.', 'Simmer for 10 minutes until veggies are cooked through. Turn off heat and stir in fresh sweet basil leaves.']),
+                'created_at' => (time() - 20) * 1000,
+                'updated_at' => (time() - 20) * 1000
+            ],
+            [
+                'id' => 'r_seed_15',
+                'title' => 'Royal Smoked Dal Bukhara',
+                'category' => 'Lunch',
+                'prep' => '15 min',
+                'cook' => '4 hours',
+                'servings' => '4',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&q=75',
+                'description' => 'A legendary 5-star delicacy of premium urad dal slow-cooked over white-hot coal embers for 18 hours, infused with double-churned white butter and silk cream.',
+                'ingredients' => json_encode(['2 cups whole black lentils (urad dal)', '1/2 cup split kidney beans (rajma)', '2 tbsp ginger-garlic paste', '1.5 cups tomato purée', '150g hand-churned salted butter', '1/2 cup organic double cream', '1 tsp Kashmiri red chili powder', 'Coal piece (for charcoal smoking)', 'Cream & ginger juliennes for garnish']),
+                'steps' => json_encode(['Soak black lentils and rajma overnight, then pressure cook with ginger-garlic paste, salt, and water until completely tender.', 'Simmer cooked lentils on slow heat for hours while continuously mashing to release natural starches.', 'In a separate skillet, sauté tomato purée and chili powder in butter, then blend directly into the simmering lentils.', 'Incorporate more butter and double cream, cooking until rich, dark, and velvety.', 'Singe a piece of natural charcoal, place in a small cup over the dal, drizzle ghee to release aromatic smoke, cap the pot with a dense lid for 5 minutes, then garnish with cream and serve.']),
+                'created_at' => (time() - 250) * 1000,
+                'updated_at' => (time() - 250) * 1000
+            ],
+            [
+                'id' => 'r_seed_16',
+                'title' => 'Saffron Infused Galouti Kebab',
+                'category' => 'Snack',
+                'prep' => '25 min',
+                'cook' => '15 min',
+                'servings' => '4',
+                'difficulty' => 'Hard',
+                'image' => 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=600&q=75',
+                'description' => 'Mouth-melting minced lamb croquettes infused with Lucknowi potli masala, raw papaya paste, and liquid saffron, seared to ultimate tender gold.',
+                'ingredients' => json_encode(['500g fine minced lamb thigh', '2 tbsp raw papaya paste', '1 tbsp ginger-garlic-chili paste', '2 tbsp roasted gram flour (sattu)', '1/4 tsp saffron strands steeped in warm rosewater', '1 tsp royal kebab spice mix (potli masala)', 'Ghee for shallow frying', 'Mint chutney and red onion rings']),
+                'steps' => json_encode(['Combine minced lamb thigh with raw papaya paste and cover for 2 hours to break down collagen and achieve a melt-in-mouth texture.', 'Mix with roasted gram flour, ginger-garlic paste, saffron rosewater, and Lucknowi kebab spice mix.', 'Whip the meat paste vigorously with the palm of your hand until airy, cohesive, and paste-like.', 'Divide into round delicate patties, refrigerate for 20 minutes to firm up.', 'Heat premium ghee in a flat iron tawa, dust patties slightly, and shallow fry carefully until a delicate brown crust forms while interior remains creamy.']),
+                'created_at' => (time() - 200) * 1000,
+                'updated_at' => (time() - 200) * 1000
+            ],
+            [
+                'id' => 'r_seed_17',
+                'title' => 'Awadhi Dum Gosht Biryani',
+                'category' => 'Dinner',
+                'prep' => '35 min',
+                'cook' => '50 min',
+                'servings' => '4',
+                'difficulty' => 'Hard',
+                'image' => 'https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=600&q=75',
+                'description' => 'The pinnacle of Royal Mughlai fine-dining. Select lamb shanks marinated in vetiver-infused yogurt, layered with aged basmati rice, steamed under dough-sealed Dum.',
+                'ingredients' => json_encode(['1kg premium aged Basmati rice', '750g tender spring lamb chops and shanks', '1 cup premium barista fried golden onions', '1 cup full-fat hung curd (yogurt)', '1/2 tsp Kashmiri saffron bloomed in warm cow milk', '2 tbsp premium cow ghee', 'Royal whole spices (cloves, cardamom, mace)', 'Rosewater & Screwpine (kewra) essence']),
+                'steps' => json_encode(['Marinate lamb shanks in yogurt, raw papaya paste, royal spices, ginger-garlic, and half the barista onions for 4 hours.', 'Parboil aged basmati rice in heavily salted water with cloves, cardamom, and bay leaf until 70% cooked.', 'In a handi pot, layer marinated lamb at bottom, cover with a blanket of fragrant rice, drizzle ghee, saffron milk, boiled rosewater, and fried onions.', 'Place airtight lid sealed with fresh flour dough around the rim to create high pressure steam (Dum style).', 'Simmer on heavy tawa on low heat for 45 minutes, rest for 10 minutes, crack open the hot dough seal, and serve.']),
+                'created_at' => (time() - 150) * 1000,
+                'updated_at' => (time() - 150) * 1000
+            ],
+            [
+                'id' => 'r_seed_18',
+                'title' => 'Zafrani Shahi Tukda Gold Decadence',
+                'category' => 'Dessert',
+                'prep' => '15 min',
+                'cook' => '25 min',
+                'servings' => '4',
+                'difficulty' => 'Medium',
+                'image' => 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=600&q=75',
+                'description' => 'A magnificent imperial bread dessert featuring ghee-fried brioche steeped in cardamom elixir, coated with thick, slow-reduced saffron rabri, and finished with edible 24k silver/gold leaf.',
+                'ingredients' => json_encode(['4 thick slices of artisan brioche bread', '1 cup pure cow ghee for frying', '1.5 liters full-cream organic milk', '1/2 cup organic sugar', '1/2 tsp saffron stamens', '1/4 tsp green cardamom powder', 'Edible 24K silver or gold leaves (Varq)', 'Toasted almonds and pistachios']),
+                'steps' => json_encode(['Reduce the full-cream milk in a wide iron kadhai by 70%, stirring constantly until thick cream flecks (rabri) form. Sweeten with sugar and saffron.', 'Prepare a light sugar syrup scented with cardamom powder, boiling for 8 minutes to a thin string consistency.', 'Trim crusts from brioche slices and cut diagonally into triangles. Fry in hot ghee until crisp, crunchy, and deep golden.', 'Immerse the crispy fried brioche toasts immediately into the warm cardamon-sugar syrup for 10 seconds to glaze.', 'Arrange glazed brioche on a platter, ladle the dense chilled saffron rabri generously over, and garnish with sliced pistachios, slivered almonds, and genuine edible silver leaf.']),
+                'created_at' => (time() - 100) * 1000,
+                'updated_at' => (time() - 100) * 1000
+            ]
+        ];
+
+        $insStmt = $pdo->prepare("INSERT INTO recipes (id, title, category, prep, cook, servings, difficulty, image, description, ingredients, steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        foreach ($seed_recipes as $sr) {
+            $insStmt->execute([
+                $sr['id'],
+                $sr['title'],
+                $sr['category'],
+                $sr['prep'],
+                $sr['cook'],
+                $sr['servings'],
+                $sr['difficulty'],
+                $sr['image'],
+                $sr['description'],
+                $sr['ingredients'],
+                $sr['steps'],
+                $sr['created_at'],
+                $sr['updated_at']
+            ]);
+        }
+    }
+
+} catch (PDOException $e) {
+    if (defined('IN_DIAGNOSTICS') && IN_DIAGNOSTICS) {
+        throw $e;
+    }
+    header('Content-Type: application/json');
+    echo json_encode([
+        "success" => false,
+        "message" => "Database connection failure: " . $e->getMessage()
+    ]);
+    exit;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Recipe Platform",
+  "description": "A comprehensive recipe management catalog built with high-fidelity custom design including WebGL backgrounds, CRUD operations, and authentication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

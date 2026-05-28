@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plat — Culinary Collection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+  <script src="webpf.js" defer></script>
+  <link rel="stylesheet" href="webpf.css">
+  <script>
+    // Protect routes: Redirect to login.html if not authenticated
+    if (!localStorage.getItem('plat_session')) {
+      window.location.href = 'login.html';
+    }
+  </script>
+</head>
+
+<body class="main-page-fade">
+  <div class="bg-grid"></div>
+
+  <!-- Main Website Shell -->
+  <div id="app-shell" style="min-height: 100vh; background: var(--bg);">
+    <nav class="app-nav">
+      <div class="nav-logo" onclick="window.location.href='index.html'">Pl<span>at</span></div>
+
+      <div class="nav-right">
+        <button class="nav-tab-btn active" id="tab-recipes-btn" onclick="window.location.href='index.html'" style="margin-right: 0.5rem;">Recipes Collection</button>
+        <button class="nav-tab-btn" id="tab-about-btn" onclick="openAboutModal()" style="margin-right: 0.5rem;">About</button>
+
+        <!-- Dynamic User Profile & Subscription Status Toolbar -->
+        <div class="profile-badge" id="user-profile-badge">
+          <!-- Avatars for both scripts -->
+          <div class="user-avatar-indicator" id="shell-user-initials">PL</div>
+          <div style="display:none" id="header-avatar">PL</div>
+          <div style="display:none" id="ph-user-avatar">PL</div>
+
+          <!-- Usernames for both scripts -->
+          <div class="user-display-name" id="shell-user-name">chef.guest@plat.cooking</div>
+          <div style="display:none" id="header-username">chef.guest@plat.cooking</div>
+
+          <!-- Logout Button -->
+          <button class="icon-btn del" style="margin-left: 0.5rem" title="Log Out" onclick="handleLogout()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="stroke-linecap:round; stroke-linejoin:round; stroke-width: 2.5;">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ═══ SECTION A: RECIPES DASHBOARD ═══ -->
+    <div id="tab-recipes-content" class="tab-content active">
+      <div class="search-row">
+        <div class="search-wrap">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input class="search-input" type="text" id="s-inp" placeholder="Search recipes or ingredients…" oninput="renderAll()">
+        </div>
+        <select class="filter-select" id="s-cat" onchange="renderAll()">
+          <option value="">All Categories</option>
+          <option>Breakfast</option>
+          <option>Lunch</option>
+          <option>Dinner</option>
+          <option>Dessert</option>
+          <option>Snack</option>
+          <option>Drinks</option>
+        </select>
+        <select class="filter-select" id="s-sort" onchange="renderAll()">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="az">A → Z</option>
+          <option value="za">Z → A</option>
+        </select>
+        <span class="res-count" id="res-count"></span>
+        <div style="margin-left: auto; display: flex; gap: 0.75rem; align-items: center;">
+          <button class="fav-filter-btn" id="s-fav-btn" onclick="toggleFavFilterOnly()" title="Toggle Favorites List">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <span>Favorites List</span>
+          </button>
+          <button class="btn-accent" onclick="openAddModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="stroke-width:2.5;">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span style="margin-left: 2px;">New Recipe</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mq-section">
+        <div class="mq-label"><span>Menu Board</span><span>Hover to Focus</span></div>
+        <div class="mq-fade-l"></div>
+        <div class="mq-fade-r"></div>
+        <div class="mq-track-container">
+          <div class="mq-track" id="mq-track"></div>
+        </div>
+      </div>
+
+      <div class="recipes-section">
+        <div class="sec-head">
+          <h2 class="sec-title">Global Collection</h2>
+          <span style="font-family:'DM Mono',monospace;font-size:.72rem;color:var(--dim)" id="coll-count"></span>
+        </div>
+        <div class="glow-grid" id="glow-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODALS & OVERLAYS ═══ -->
+  
+  <!-- Add/Edit Recipe Modal -->
+  <div class="overlay" id="ov-form" onclick="ovc(event,'ov-form')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h3 class="modal-title" id="fm-title">Add New Recipe</h3>
+        <button class="modal-close" onclick="cm('ov-form')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Title *</label>
+            <input class="form-input" id="f-title" placeholder="e.g. Risotto Milanese">
+            <div id="re-title-err" class="validation-error-msg" style="display: none;"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="f-cat">
+              <option>Dinner</option>
+              <option>Breakfast</option>
+              <option>Lunch</option>
+              <option>Dessert</option>
+              <option>Snack</option>
+              <option>Drinks</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Prep Time</label>
+            <input class="form-input" id="f-prep" placeholder="e.g. 15 min">
+            <div id="re-prep-err" class="validation-error-msg" style="display: none;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cook Time</label>
+            <input class="form-input" id="f-cook" placeholder="e.g. 30 min">
+            <div id="re-cook-err" class="validation-error-msg" style="display: none;"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Servings</label>
+            <input class="form-input" id="f-srv" placeholder="e.g. 4">
+            <div id="re-srv-err" class="validation-error-msg" style="display: none;"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Difficulty</label>
+            <select class="form-select" id="f-diff">
+              <option>Easy</option>
+              <option>Medium</option>
+              <option>Hard</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Image URL / Source</span>
+            <span style="font-size: 0.72rem; color: var(--muted); text-transform: none; font-weight: normal;">Upload or choose preset</span>
+          </label>
+          <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+            <input class="form-input" id="f-img" placeholder="https://images.unsplash.com/... or upload local" style="flex: 1;">
+            <button type="button" class="btn-add btn-add-step" id="btn-upload-trigger" onclick="triggerLocalUpload()">
+              Upload
+            </button>
+            <button type="button" class="btn-add btn-add-step" id="btn-presets-trigger" onclick="togglePresetPicker()">
+              Presets
+            </button>
+          </div>
+          <input type="file" id="local-img-file" accept="image/*" style="display: none;" onchange="handleLocalImageUpload(event)">
+          <div id="re-img-warn" class="validation-warning-msg" style="display: none; color: #ffbc00; font-size: 0.8rem; margin-top: 0.25rem;"></div>
+          
+          <!-- Presets Grid Dropdown -->
+          <div id="presets-panel" style="display: none; background: rgba(9, 9, 15, 0.95); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.75rem; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace;">
+              <span>Quick Preset Culinary Images</span>
+              <button type="button" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.75rem;" onclick="togglePresetPicker()">✕ Close</button>
+            </div>
+            <div id="presets-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; max-height: 150px; overflow-y: auto; padding-right: 2px;">
+              <!-- Presets populated by JS -->
+            </div>
+          </div>
+
+          <!-- Image Live Preview Box -->
+          <div id="form-img-preview-container" style="display: none; margin-top: 0.5rem; text-align: center; border: 1px dashed var(--border); padding: 0.5rem; border-radius: 8px; background: rgba(0,0,0,0.25);">
+            <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem; font-family: 'DM Mono', monospace; text-transform: uppercase;">Image Live Preview</div>
+            <img id="form-img-preview" src="" alt="Recipe Preview" style="max-height: 120px; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: inline-block;">
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="f-desc"
+            placeholder="Brief description…"></textarea></div>
+        <div class="form-group">
+          <label class="form-label">Ingredients</label>
+          <div class="ing-list" id="ing-list"></div>
+          <div class="add-row">
+            <input type="text" id="new-ing" placeholder="e.g. 2 cups arborio rice"
+              onkeydown="if(event.key==='Enter'){addIng();event.preventDefault();}">
+            <button class="btn-add btn-add-ing" onclick="addIng()">+ Add</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preparation Steps</label>
+          <div class="steps-list" id="steps-list"></div>
+          <div class="add-row">
+            <textarea id="new-step" placeholder="Describe this step…"></textarea>
+            <button class="btn-add btn-add-step" onclick="addStep()">+ Step</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-cancel" onclick="cm('ov-form')">Cancel</button>
+        <button class="btn-save" onclick="saveRecipe()">Save Recipe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recipe Details Overlay -->
+  <div class="overlay" id="ov-det" onclick="ovc(event,'ov-det')">
+    <div class="modal det-modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h3 class="modal-title">Recipe Detail</h3><button class="modal-close" onclick="cm('ov-det')">✕</button>
+      </div>
+      <div id="det-content"></div>
+    </div>
+  </div>
+
+  <!-- Delete Recipe Confirmation Modal -->
+  <div class="overlay" id="ov-del" onclick="ovc(event,'ov-del')">
+    <div class="modal conf-modal" onclick="event.stopPropagation()">
+      <div class="conf-body">
+        <div class="conf-icon">🗑️</div>
+        <h3 class="conf-title">Delete Recipe?</h3>
+        <p class="conf-msg">This action cannot be undone.</p>
+      </div>
+      <div class="conf-foot"><button class="btn-cancel" onclick="cm('ov-del')">Keep It</button><button
+          class="btn-danger" onclick="confirmDel()">Delete</button></div>
+    </div>
+  </div>
+
+  <!-- About Modal Overlay -->
+  <div class="overlay" id="ov-about" onclick="ovc(event,'ov-about')">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 500px; border: 1px solid var(--border-hi); background: rgba(18, 18, 29, 0.95); backdrop-filter: blur(20px);">
+      <div class="modal-head" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+        <h3 class="modal-title" style="font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; color: #fff;">About Plat</h3>
+        <button class="modal-close" onclick="cm('ov-about')" style="background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div class="modal-body" style="color: var(--cream); font-family: 'Syne', sans-serif; line-height: 1.6;">
+        <p style="font-size: 1rem; color: var(--muted); margin-bottom: 1.5rem;">
+          Plat is a premium, culinary hub and creative collection workspace designed for professional cooks and enthusiasts of the culinary craft to document pristine recipes instantly.
+        </p>
+        
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem;">
+          <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;">Contributors</h4>
+          <p style="font-size: 1.1rem; font-weight: 600; color: #fff; margin-bottom: 0.25rem;">Tushar Das</p>
+          <p style="font-size: 1.1rem; font-weight: 600; color: #fff;">Sagarika Nath</p>
+        </div>
+
+        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(9, 9, 15, 0.4) 100%); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="position: relative; width: 40px; height: 40px; border-radius: 10px; background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(16, 185, 129, 0.25);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M3 5V19A9 3 0 0 0 21 19V5"/>
+                <path d="M3 12A9 3 0 0 0 21 12"/>
+              </svg>
+              <span class="pulse-indicator" style="position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
+            </div>
+            <div>
+              <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: #10b981; margin-bottom: 0.25rem;">Active Database Status</h4>
+              <p style="font-size: 0.85rem; color: var(--cream); line-height: 1.4;">PHP PDO connected • Local SQLite engine operational</p>
+            </div>
+          </div>
+          <a href="test.php" class="social-btn" style="padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.15); font-size: 0.8rem; color: #fff; text-decoration: none; font-weight: 500; font-family: 'DM Mono', monospace; transition: all 0.2s; white-space: nowrap;">Check Database →</a>
+        </div>
+
+        <div style="text-align: center; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+          <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;">Connect with us</h4>
+          <div style="display: flex; justify-content: center; gap: 1.25rem;">
+            <a href="https://github.com/Xdzy-TD" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+            </a>
+            <a href="https://x.com/XdzynN777" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+            </a>
+            <a href="https://linkedin.com/tushar-das-xdzynn" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script>
+    // Fetch active session credentials and assign to the DOM
+    const userSession = JSON.parse(localStorage.getItem('plat_session'));
+    if (userSession) {
+      document.getElementById('header-username').textContent = userSession.email;
+      document.getElementById('header-avatar').textContent = userSession.fullname.substring(0, 2).toUpperCase();
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('plat_session');
+      localStorage.removeItem('plat_current_user_v3');
+      window.location.href = 'login.html';
+    }
+
+    // Auto open add modal if action requested
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'new') {
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          if (typeof openAddModal === 'function') {
+            openAddModal();
+          }
+        }, 300);
+      });
+    }
+  </script>
+</body>
+
+</html>

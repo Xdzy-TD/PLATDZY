@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plat — Cinematic Recipe Sharing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+  <script src="webpf.js" defer></script>
+  <link rel="stylesheet" href="webpf.css">
+  <script>
+    // Protect routes: Redirect to login.html if not authenticated
+    if (!localStorage.getItem('plat_session')) {
+      window.location.href = 'login.html';
+    }
+  </script>
+</head>
+
+<body class="main-page-fade">
+  <div class="bg-grid"></div>
+
+  <!-- Main Navigation Bar -->
+  <nav class="app-nav">
+    <div class="nav-logo" onclick="window.location.href='index.html'">Pl<span>at</span></div>
+
+    <div class="nav-right">
+      <button class="nav-tab-btn" id="tab-recipes-btn" onclick="window.location.href='recipes.html'" style="margin-right: 0.5rem;">Recipes Collection</button>
+      <button class="nav-tab-btn" id="tab-about-btn" onclick="openAboutModal()" style="margin-right: 0.5rem;">About</button>
+
+      <!-- Dynamic User Profile & Subscription Status Toolbar -->
+      <div class="profile-badge hidden" id="user-profile-badge">
+        <div class="user-avatar-indicator" id="shell-user-initials">PL</div>
+        <div class="user-display-name" id="shell-user-name">chef.guest@plat.cooking</div>
+
+        <!-- Logout Button -->
+        <button class="icon-btn del" style="margin-left: 0.5rem" title="Log Out" onclick="handleLogout()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="stroke-linecap:round; stroke-linejoin:round; stroke-width: 2.5;">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <section id="hero">
+    <div class="hero-text-wrapper" id="hero-text">
+      <p class="hero-tag" id="hero-tag">— The Art of Cooking —</p>
+      <h1 class="hero-line1" id="hero-line1">Discover &amp; Create</h1>
+      <h1 class="hero-line2" id="hero-line2">Your Recipes</h1>
+      <p class="hero-sub" id="hero-sub">Web Culinary Platform</p>
+      <div class="hero-cta" id="hero-cta">
+        <div class="scroll-down-container" onclick="window.scrollTo({top: 1200, behavior: 'smooth'})">
+          <span class="scroll-down-text">Scroll to explore</span>
+          <svg class="scroll-down-arrow" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll overlay -->
+    <div class="cta-overlay" id="cta-overlay">
+      <h2 class="cto-title">Ready to cook?</h2>
+      <p class="cto-sub">A pristine collection awaits — browse and coordinate clean recipes instantly.</p>
+      <div style="display:flex;gap:1rem;pointer-events:auto;justify-content:center;margin-top:1.5rem;">
+        <button class="btn-light" onclick="window.location.href='recipes.html'">Explore Now</button>
+      </div>
+    </div>
+
+    <!-- Cinematic perspective card container -->
+    <div class="cin-wrap">
+      <div class="cin-card" id="cin-card" onmousemove="cardMouse(event)">
+        <div class="card-sheen"></div>
+        <div class="card-grid-bg"></div>
+        <div class="cin-layout">
+
+          <div class="cl-left" id="cl-left">
+            <p class="card-label">Recipe Platform</p>
+            <h2 class="card-heading">Cuisine,<br>Reimagined.</h2>
+            <p class="card-body-txt">Capture every dish, technique, and flavour. Your personal cookbook — beautifully
+              organised.</p>
+            <div class="card-stats">
+              <div>
+                <div class="stat-val" id="stat-n">0</div>
+                <div class="stat-lbl">Recipes</div>
+              </div>
+              <div>
+                <div class="stat-val">6</div>
+                <div class="stat-lbl">Categories</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cl-center" id="cl-center">
+            <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+              <div class="phone-bezel" id="phone-bezel">
+                <div class="hw-btn" style="top:110px;left:-3px;width:3px;height:22px;"></div>
+                <div class="hw-btn" style="top:148px;left:-3px;width:3px;height:44px;"></div>
+                <div class="hw-btn" style="top:202px;left:-3px;width:3px;height:44px;"></div>
+                <div class="hw-btn" style="top:158px;right:-3px;width:3px;height:66px;transform:scaleX(-1)"></div>
+                <div class="phone-screen">
+                  <div class="dyn-island">
+                    <div class="island-dot"></div>
+                  </div>
+                  <div class="screen-glare"></div>
+                  <div class="phone-content">
+                    <div class="ph-header" id="ph-hdr">
+                      <span class="ph-title">Plat</span>
+                      <div class="ph-avatar">PL</div>
+                    </div>
+                    <div class="ph-feature" id="ph-ft">
+                      <div class="pf-lbl">Featured Today</div>
+                      <div class="pf-name">Pasta Carbonara</div>
+                      <div class="pf-meta">15 min · 🔥 Medium</div>
+                    </div>
+                    <div class="ph-list" id="ph-lst">
+                      <div class="ph-item">
+                        <div class="pi-dot" style="background:var(--accent);box-shadow:0 0 6px rgba(232,99,42,.5)">
+                        </div>
+                        <div class="pi-lines">
+                          <div class="pi-line"></div>
+                          <div class="pi-line pi-short"></div>
+                        </div>
+                      </div>
+                      <div class="ph-item">
+                        <div class="pi-dot" style="background:var(--sage);box-shadow:0 0 6px rgba(90,143,106,.5)"></div>
+                        <div class="pi-lines">
+                          <div class="pi-line"></div>
+                          <div class="pi-line pi-short"></div>
+                        </div>
+                      </div>
+                      <div class="ph-item">
+                        <div class="pi-dot" style="background:var(--accent2);box-shadow:0 0 6px rgba(74,158,255,.5)">
+                        </div>
+                        <div class="pi-lines">
+                          <div class="pi-line"></div>
+                          <div class="pi-line pi-short"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="phone-bar"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="float-badge" id="fb1" style="top:12px;left:-105px;">
+                <div class="fb-icon" style="background:rgba(212,168,83,.15);border:1px solid rgba(212,168,83,.2)">🏆
+                </div>
+                <div class="fb-text">
+                  <p>Top Rated</p>
+                  <p>Best this week</p>
+                </div>
+              </div>
+              <div class="float-badge" id="fb2" style="bottom:32px;right:-110px;">
+                <div class="fb-icon" style="background:rgba(90,143,106,.15);border:1px solid rgba(90,143,106,.2)">✅
+                </div>
+                <div class="fb-text">
+                  <p>System Online</p>
+                  <p>DB connection active</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cl-right" id="cl-right">
+            <p class="card-big-word">Plat</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Modal Overlay -->
+  <div class="overlay" id="ov-about" onclick="ovc(event,'ov-about')">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 500px; border: 1px solid var(--border-hi); background: rgba(18, 18, 29, 0.95); backdrop-filter: blur(20px);">
+      <div class="modal-head" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+        <h3 class="modal-title" style="font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; color: #fff;">About Plat</h3>
+        <button class="modal-close" onclick="cm('ov-about')" style="background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+      <div class="modal-body" style="color: var(--cream); font-family: 'Syne', sans-serif; line-height: 1.6;">
+        <p style="font-size: 1rem; color: var(--muted); margin-bottom: 1.5rem;">
+          Plat is a premium, culinary hub and creative collection workspace designed for professional cooks and enthusiasts of the culinary craft to document pristine recipes instantly.
+        </p>
+        
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem;">
+          <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;">Contributors</h4>
+          <p style="font-size: 1.1rem; font-weight: 600; color: #fff; margin-bottom: 0.25rem;">Tushar Das</p>
+          <p style="font-size: 1.1rem; font-weight: 600; color: #fff;">Sagarika Nath</p>
+        </div>
+
+        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(9, 9, 15, 0.4) 100%); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="position: relative; width: 40px; height: 40px; border-radius: 10px; background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(16, 185, 129, 0.25);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M3 5V19A9 3 0 0 0 21 19V5"/>
+                <path d="M3 12A9 3 0 0 0 21 12"/>
+              </svg>
+              <span class="pulse-indicator" style="position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
+            </div>
+            <div>
+              <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: #10b981; margin-bottom: 0.25rem;">Active Database Status</h4>
+              <p style="font-size: 0.85rem; color: var(--cream); line-height: 1.4;">PHP PDO connected • Local SQLite engine operational</p>
+            </div>
+          </div>
+          <a href="test.php" class="social-btn" style="padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.15); font-size: 0.8rem; color: #fff; text-decoration: none; font-weight: 500; font-family: 'DM Mono', monospace; transition: all 0.2s; white-space: nowrap;">Check Database →</a>
+        </div>
+
+        <div style="text-align: center; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1.5rem;">
+          <h4 style="font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;">Connect with us</h4>
+          <div style="display: flex; justify-content: center; gap: 1.25rem;">
+            <a href="https://github.com/Xdzy-TD" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+            </a>
+            <a href="https://x.com/XdzynN777" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+            </a>
+            <a href="https://linkedin.com/tushar-das-xdzynn" target="_blank" class="social-btn" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(9, 9, 15, 0.5); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; transition: all 0.25s ease-out; text-decoration: none;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script>
+    // Fetch active session credentials and assign to the DOM on load
+    const user = JSON.parse(localStorage.getItem('plat_session'));
+    if (user) {
+      const initials = (user.fullname || 'GC').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      const initialsElem = document.getElementById('shell-user-initials');
+      if (initialsElem) initialsElem.textContent = initials;
+      const nameElem = document.getElementById('shell-user-name');
+      if (nameElem) nameElem.textContent = user.fullname || user.email.split('@')[0];
+      const badge = document.getElementById('user-profile-badge');
+      if (badge) badge.classList.remove('hidden');
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('plat_session');
+      localStorage.removeItem('plat_current_user_v3');
+      window.location.href = 'login.html';
+    }
+  </script>
+</body>
+
+</html>
