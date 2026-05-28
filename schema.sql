@@ -6,20 +6,19 @@ USE `plat_culinary_db`;
 
 -- 1. USERS SECURITY TABLE
 CREATE TABLE IF NOT EXISTS `users` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(100) NOT NULL,
-  `email` VARCHAR(150) UNIQUE NOT NULL,
+  `id` VARCHAR(64) PRIMARY KEY,
+  `email` VARCHAR(128) UNIQUE NOT NULL,
   `password_hash` VARCHAR(255) NOT NULL,
-  `subscription_tier` ENUM('Free', 'Pro', 'Enterprise') DEFAULT 'Free',
+  `fullname` VARCHAR(128) NOT NULL,
+  `plan` VARCHAR(32) DEFAULT 'free',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. RECIPES CABINET REGISTRY TABLE
 CREATE TABLE IF NOT EXISTS `recipes` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id` INT DEFAULT NULL, -- Null refers to baseline system/seeded recipes
+  `user_id` VARCHAR(64) DEFAULT NULL, -- Null refers to baseline system/seeded recipes
   `title` VARCHAR(255) NOT NULL,
   `category` ENUM('Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack', 'Drinks') DEFAULT 'Dinner',
   `prep_time` VARCHAR(50) DEFAULT NULL,
@@ -51,15 +50,4 @@ CREATE TABLE IF NOT EXISTS `recipe_steps` (
   `step_text` TEXT NOT NULL,
   `step_number` INT NOT NULL,
   FOREIGN KEY (`recipe_id`) REFERENCES `recipes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 5. SUBSCRIPTION RECORD TRANSACTIONS LOGS
-CREATE TABLE IF NOT EXISTS `subscriptions_history` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id` INT NOT NULL,
-  `tier` ENUM('Free', 'Pro', 'Enterprise') NOT NULL,
-  `amount_paid` DECIMAL(6,2) DEFAULT 0.00,
-  `status` VARCHAR(50) DEFAULT 'Active',
-  `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
